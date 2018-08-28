@@ -5,10 +5,9 @@ extern crate serde_json;
 
 extern crate actix_web;
 
-use actix_web::{App, Error, HttpRequest, HttpResponse, Json, Responder, server};
-use actix_web::Result as ActixResult;
+use actix_web::{App,  http, HttpResponse, Json, server};
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 struct NextArrivalRequest{
     station: String,
     direction: String,
@@ -22,36 +21,23 @@ struct NextArrivalResponse{
     //TODO: Give time as in 00:00pm or "6 minutes"
 }
 
-impl Responder for NextArrivalResponse{
-    //https://actix.rs/api/actix-web/stable/actix_web/trait.Responder.html
-    type Item = HttpResponse;
-    type Error = Error;
-
-    fn respond_to<S>(self, _req: &HttpRequest<S>) -> Result<HttpResponse, Error>{
-        if self.e.is_some(){
-            return Err(self.e.unwrap());
-        } else {
-            let body = serde_json::to_string(&self)?;
-            Ok(HttpResponse::Ok()).content_type("application/json")
-                .body(body)
-        }
-    }
-}
-
 fn main() {
     server::new(|| {
-        App::new().resource("/next-arrival", |r| r.method(http::Method::Post)
+        App::new().resource("/next-arrival", |r| r.method(http::Method::POST)
             .with(next_arrival))
     }).bind("0.0.0.0:8000").unwrap().run();
     println!("app started on port 8000");
 }
 
-//fn next_arrival(req: Json<NextArrivalRequest>) -> impl Responder{
-fn next_arrival(req: Json<NextArrivalRequest>) -> ActixResult<String>{
+fn next_arrival(req: Json<NextArrivalRequest>) -> HttpResponse{
     //TODO: validate direction and station strings, get current time and use that too.
 
     //for now, just print out what we get
 
-    return Ok(HttpResponse::Ok().content_type())
+    match serde_json::to_string(&req.into_inner()) {
+        Ok(s) => return HttpResponse::Ok().content_type("application/json").body(s),
+        _ => return HttpResponse::BadRequest().content_type("application/json").body("error decoding"),
+    }
+
 }
 
