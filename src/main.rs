@@ -11,6 +11,7 @@ extern crate csv;
 use actix_web::{App,  http, HttpResponse, Json, server};
 use chrono::{Datelike, DateTime, Local, Timelike, Weekday};
 use std::error::Error;
+use std::cmp::Ordering;
 
 #[derive(RustEmbed)]
 #[folder = "data/"]
@@ -123,10 +124,7 @@ fn parse_request_pick_file(t: DateTime<Local>, direction: &str)-> Option<String>
         _ => "weekday",
     };
     match direction{
-        "east" | "west" => {
-            println!("the file to open is {}bound-{}-schedule.csv", direction, day);
-            return Some(format!("{}bound-{}-schedule.csv", direction, day))
-        },
+        "east" | "west" => return Some(format!("{}bound-{}-schedule.csv", direction, day)),
         _ => {
             println!("not east or west?");
             return None
@@ -139,7 +137,6 @@ fn next_arrival(req: Json<NextArrivalRequest>) -> HttpResponse {
     let t = Local::now();
     match parse_request_pick_file(t, input.direction.as_str()){
         Some(data) => {
-            println!("{}", data.clone());
             match search_csv(data, input.station.clone()){
                 Ok(s) => {
                     match serde_json::to_string(&NextArrivalResponse{
@@ -166,7 +163,6 @@ fn search_csv(filename: String, station: String) -> Result<String, Box<Error>>{
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize(){
                 let record: StationTimeSlice = result?;
-                println!("{:?}", record);
                 match record.cwe { //hardcoding cwe for now
                     Some(s) => {
                         if schedule_time_is_later_than_now(s.clone()){
@@ -174,7 +170,6 @@ fn search_csv(filename: String, station: String) -> Result<String, Box<Error>>{
                         }
                     },
                     None => {
-                        println!("continuing on none");
                         continue
                     } //empty field in csv; keep looking
                 }
@@ -186,22 +181,22 @@ fn search_csv(filename: String, station: String) -> Result<String, Box<Error>>{
 }
 
 fn schedule_time_is_later_than_now(s: String) -> bool{
-    //s looks like 4:15A
     let mut st = s.clone();
     let mut plus_twelve = false;
     if st.pop().unwrap().to_string().eq("P"){
         plus_twelve = true;
     }
-    println!("{}", st);
     let x: Vec<&str> = st.split(":").collect();
     let mut hh: u32 = x[0].parse::<u32>().unwrap();
     let mm: u32 = x[1].parse::<u32>().unwrap();
     if plus_twelve{
-        hh = hh + 12;
+        hh = (hh + 12) % 24;
     }
     let t = Local::now();
-    if t.minute() < mm && t.hour() < hh{
-        return true;
+    let other = Local::today().and_hms(hh, mm, 00);
+    match t.cmp(&other){
+        Ordering::Less => return true,
+        Ordering::Equal => return true,
+        Ordering::Greater => return false,
     }
-    return false;
 }
