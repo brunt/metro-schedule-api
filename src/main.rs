@@ -137,7 +137,7 @@ fn next_arrival(req: Json<NextArrivalRequest>) -> HttpResponse {
     let t = Local::now();
     match parse_request_pick_file(t, input.direction.as_str()){
         Some(data) => {
-            match search_csv(data, input.station.clone()){
+            match search_csv(data, input.station.clone(), t){
                 Ok(s) => {
                     match serde_json::to_string(&NextArrivalResponse{
                         station: input.station,
@@ -156,7 +156,7 @@ fn next_arrival(req: Json<NextArrivalRequest>) -> HttpResponse {
     }
 }
 
-fn search_csv(filename: String, station: String) -> Result<String, Box<Error>>{
+fn search_csv(filename: String, station: String, t: DateTime<Local>) -> Result<String, Box<Error>>{
     let t = Local::now();
     match Asset::get(&filename) {
         Some(file_contents) => {
@@ -165,13 +165,11 @@ fn search_csv(filename: String, station: String) -> Result<String, Box<Error>>{
                 let record: StationTimeSlice = result?;
                 match record.cwe { //hardcoding cwe for now
                     Some(s) => {
-                        if schedule_time_is_later_than_now(s.clone()){
+                        if schedule_time_is_later_than_now(t, s.clone()){
                             return Ok(s)
                         }
                     },
-                    None => {
-                        continue
-                    } //empty field in csv; keep looking
+                    None => continue //empty field in csv; keep looking
                 }
             }
             return Err(From::from("failed to find a time from schedule data"));
@@ -180,7 +178,7 @@ fn search_csv(filename: String, station: String) -> Result<String, Box<Error>>{
     }
 }
 
-fn schedule_time_is_later_than_now(s: String) -> bool{
+fn schedule_time_is_later_than_now(t: DateTime<Local> ,s: String) -> bool{
     let mut st = s.clone();
     let mut plus_twelve = false;
     if st.pop().unwrap().to_string().eq("P"){
@@ -192,9 +190,7 @@ fn schedule_time_is_later_than_now(s: String) -> bool{
     if plus_twelve{
         hh = (hh + 12) % 24;
     }
-    let t = Local::now();
-    let other = Local::today().and_hms(hh, mm, 00);
-    match t.cmp(&other){
+    match t.cmp(&Local::today().and_hms(hh, mm, 00)){
         Ordering::Less => return true,
         Ordering::Equal => return true,
         Ordering::Greater => return false,
