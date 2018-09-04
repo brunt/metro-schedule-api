@@ -9,7 +9,7 @@ extern crate chrono;
 extern crate csv;
 
 use actix_web::{App,  http, HttpResponse, Json, server};
-use chrono::{Datelike, DateTime, Local, Weekday};
+use chrono::{Datelike, DateTime, Local, Timelike, Weekday};
 use std::error::Error;
 
 #[derive(RustEmbed)]
@@ -123,8 +123,14 @@ fn parse_request_pick_file(t: DateTime<Local>, direction: &str)-> Option<String>
         _ => "weekday",
     };
     match direction{
-        "east" | "west" => return Some(format!("{}bound-{}-schedule.csv", direction, day)),
-        _ => return None
+        "east" | "west" => {
+            println!("the file to open is {}bound-{}-schedule.csv", direction, day);
+            return Some(format!("{}bound-{}-schedule.csv", direction, day))
+        },
+        _ => {
+            println!("not east or west?");
+            return None
+        }
     };
 }
 
@@ -133,29 +139,69 @@ fn next_arrival(req: Json<NextArrivalRequest>) -> HttpResponse {
     let t = Local::now();
     match parse_request_pick_file(t, input.direction.as_str()){
         Some(data) => {
-            match search_csv(data, input.station){
-                Ok(s) => return HttpResponse::Ok().content_type("application/json").body("ok"), //TODO: send response struct
-                _ => return HttpResponse::BadRequest().finish()
+            println!("{}", data.clone());
+            match search_csv(data, input.station.clone()){
+                Ok(s) => {
+                    match serde_json::to_string(&NextArrivalResponse{
+                        station: input.station,
+                        direction: input.direction,
+                        time: s
+                    }) {
+                        Ok(s) => return HttpResponse::Ok().content_type("application/json").body(s),
+                        _ => return HttpResponse::BadRequest().reason("error building response").finish(),
+                    }
+
+                },
+                _ => return HttpResponse::BadRequest().reason("error during match").finish()
             }
         },
         None => return HttpResponse::BadRequest().reason("direction must be 'east' or 'west'").finish()
     }
 }
 
-fn search_csv(filename: String, station: String) -> Result<(), Box<Error>>{
+fn search_csv(filename: String, station: String) -> Result<String, Box<Error>>{
     let t = Local::now();
     match Asset::get(&filename) {
         Some(file_contents) => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize(){
                 let record: StationTimeSlice = result?;
-
-                //TODO: match req.station to struct attribute
-                println!("{}", record);
+                println!("{:?}", record);
+                match record.cwe { //hardcoding cwe for now
+                    Some(s) => {
+                        if schedule_time_is_later_than_now(s.clone()){
+                            return Ok(s)
+                        }
+                    },
+                    None => {
+                        println!("continuing on none");
+                        continue
+                    } //empty field in csv; keep looking
+                }
             }
-            Ok(())
-        }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
         None => Err(From::from("failed to get embedded csv file"))
     }
 }
 
+fn schedule_time_is_later_than_now(s: String) -> bool{
+    //s looks like 4:15A
+    let mut st = s.clone();
+    let mut plus_twelve = false;
+    if st.pop().unwrap().to_string().eq("P"){
+        plus_twelve = true;
+    }
+    println!("{}", st);
+    let x: Vec<&str> = st.split(":").collect();
+    let mut hh: u32 = x[0].parse::<u32>().unwrap();
+    let mm: u32 = x[1].parse::<u32>().unwrap();
+    if plus_twelve{
+        hh = hh + 12;
+    }
+    let t = Local::now();
+    if t.minute() < mm && t.hour() < hh{
+        return true;
+    }
+    return false;
+}
