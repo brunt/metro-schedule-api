@@ -2,36 +2,36 @@
 extern crate rust_embed;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde;
-extern crate serde_json;
 extern crate actix_web;
 extern crate chrono;
 extern crate csv;
+extern crate serde;
+extern crate serde_json;
 
-use actix_web::{App,  http, HttpResponse, Json, server};
-use chrono::{Datelike, DateTime, Local, Timelike, Weekday};
-use std::error::Error;
+use actix_web::{http, server, App, HttpResponse, Json};
+use chrono::{DateTime, Datelike, Local, Timelike, Weekday};
 use std::cmp::Ordering;
+use std::error::Error;
 
 #[derive(RustEmbed)]
 #[folder = "data/"]
 struct Asset;
 
 #[derive(Serialize, Deserialize)]
-struct NextArrivalRequest{
+struct NextArrivalRequest {
     station: String,
     direction: String,
 }
 
 #[derive(Serialize)]
-struct NextArrivalResponse{
+struct NextArrivalResponse {
     station: String,
     direction: String,
     time: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-struct StationTimeSlice{
+struct StationTimeSlice {
     #[serde(rename = "Lambert Airport Terminal #1")]
     lambert_t1: Option<String>,
     #[serde(rename = "Lambert Airport Terminal #2")]
@@ -112,85 +112,143 @@ struct StationTimeSlice{
 
 fn main() {
     server::new(|| {
-        App::new().resource("/next-arrival", |r| r.method(http::Method::POST)
-            .with(next_arrival))
-    }).bind("0.0.0.0:8000").expect("Address already in use").run();
+        App::new().resource("/next-arrival", |r| {
+            r.method(http::Method::POST).with(next_arrival)
+        })
+    }).bind("0.0.0.0:8000")
+        .expect("Address already in use")
+        .run();
     println!("app started on port 8000");
-}
-
-fn parse_request_pick_file(t: DateTime<Local>, direction: &str)-> Option<String>{
-    let day: &str = match t.weekday(){
-        Weekday::Sat | Weekday::Sun => "weekend",
-        _ => "weekday",
-    };
-    match direction{
-        "east" | "west" => return Some(format!("{}bound-{}-schedule.csv", direction, day)),
-        _ => {
-            println!("not east or west?");
-            return None
-        }
-    };
 }
 
 fn next_arrival(req: Json<NextArrivalRequest>) -> HttpResponse {
     let input = req.into_inner();
     let t = Local::now();
-    match parse_request_pick_file(t, input.direction.as_str()){
-        Some(data) => {
-            match search_csv(data, input.station.clone(), t){
-                Ok(s) => {
-                    match serde_json::to_string(&NextArrivalResponse{
-                        station: input.station,
-                        direction: input.direction,
-                        time: s
-                    }) {
-                        Ok(s) => return HttpResponse::Ok().content_type("application/json").body(s),
-                        _ => return HttpResponse::BadRequest().reason("error building response").finish(),
-                    }
-
-                },
-                _ => return HttpResponse::BadRequest().reason("error during match").finish()
+    match parse_request_pick_file(t, input.direction.as_str()) {
+        Some(data) => match search_csv(data, &input.station, t) {
+            Ok(s) => match serde_json::to_string(&NextArrivalResponse {
+                station: input.station,
+                direction: input.direction,
+                time: s,
+            }) {
+                Ok(s) => return HttpResponse::Ok().content_type("application/json").body(s),
+                _ => {
+                    return HttpResponse::BadRequest()
+                        .reason("error building response")
+                        .finish()
+                }
+            },
+            Err(e) => {
+                println!("{:?}", e.description());
+                return HttpResponse::BadRequest()
+                    .reason("error during match")
+                    .finish();
             }
         },
-        None => return HttpResponse::BadRequest().reason("direction must be 'east' or 'west'").finish()
+        None => {
+            return HttpResponse::BadRequest()
+                .reason("direction must be 'east' or 'west'")
+                .finish()
+        }
     }
 }
 
-fn search_csv(filename: String, station: String, t: DateTime<Local>) -> Result<String, Box<Error>>{
+fn parse_request_pick_file(t: DateTime<Local>, direction: &str) -> Option<String> {
+    let day: &str = match t.weekday() {
+        Weekday::Sat | Weekday::Sun => "weekend",
+        _ => "weekday",
+    };
+    match direction {
+        "east" | "west" => return Some(format!("{}bound-{}-schedule.csv", direction, day)),
+        _ => {
+            println!("not east or west?");
+            return None;
+        }
+    };
+}
+
+fn search_csv(filename: String, station: &str, t: DateTime<Local>) -> Result<String, Box<Error>> {
     let t = Local::now();
     match Asset::get(&filename) {
         Some(file_contents) => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
-            for result in reader.deserialize(){
+            for result in reader.deserialize() {
                 let record: StationTimeSlice = result?;
-                match record.cwe { //hardcoding cwe for now
-                    Some(s) => {
-                        if schedule_time_is_later_than_now(t, s.clone()){
-                            return Ok(s)
+                match station {
+                    "lambert" | "lambert terminal 1" | "Lambert Airport Terminal #1" => {
+                        match record.lambert_t1.clone() {
+                            Some(s) => {
+                                if schedule_time_is_later_than_now(t, s.clone()) {
+                                    return Ok(s);
+                                }
+                            }
+                            None => continue, //empty field in csv; keep looking
                         }
                     },
-                    None => continue //empty field in csv; keep looking
+                    "lambert2" | "lambert terminal 2" | "Lambert Airport Terminal #2" => {
+                        match record.lambert_t2.clone() {
+                            Some(s) => {
+                                if schedule_time_is_later_than_now(t, s.clone()) {
+                                    return Ok(s);
+                                }
+                            }
+                            None => continue,
+                        }
+                    },
+                    "hanley" | "north hanley" | "North Hanley Station" => match record.north_hanley.clone(){
+                        Some(s) => {
+                            if schedule_time_is_later_than_now(t, s.clone()) {
+                                return Ok(s);
+                            }
+                        }
+                        None => continue,
+                    },
+                    "umsl" | "umsl north" | "UMSL North Station" => match record.umsl_north.clone() {
+                        Some(s) => {
+                            if schedule_time_is_later_than_now(t, s.clone()) {
+                                return Ok(s);
+                            }
+                        }
+                        None => continue,
+                    },
+                    "south umsl" | "umsl south" | "UMSL North Station" => match record.umsl_south.clone(){
+                        Some(s) => {
+                            if schedule_time_is_later_than_now(t, s.clone()) {
+                                return Ok(s);
+                            }
+                        }
+                        None => continue,
+                    },
+                    "cortex" | "cortex station" | "Cortex Station" => match record.cortex.clone() {
+                        Some(s) => {
+                            if schedule_time_is_later_than_now(t, s.clone()) {
+                                return Ok(s);
+                            }
+                        }
+                        None => continue,
+                    },
+                    //TODO: finish match cases
+                    _ => return Err(From::from("that station is not in the schedule")),
                 }
             }
             return Err(From::from("failed to find a time from schedule data"));
-        },
-        None => Err(From::from("failed to get embedded csv file"))
+        }
+        None => Err(From::from("failed to get embedded csv file")),
     }
 }
 
-fn schedule_time_is_later_than_now(t: DateTime<Local> ,s: String) -> bool{
-    let mut st = s.clone();
+fn schedule_time_is_later_than_now(t: DateTime<Local>, mut s: String) -> bool {
     let mut plus_twelve = false;
-    if st.pop().unwrap().to_string().eq("P"){
+    if s.pop().unwrap().to_string().eq("P") {
         plus_twelve = true;
     }
-    let x: Vec<&str> = st.split(":").collect();
-    let mut hh: u32 = x[0].parse::<u32>().unwrap();
-    let mm: u32 = x[1].parse::<u32>().unwrap();
-    if plus_twelve{
-        hh = (hh + 12) % 24;
+    let x: Vec<&str> = s.split(":").collect();
+    let mut hh: u32 = x[0].parse::<u32>().unwrap_or_default();
+    let mm: u32 = x[1].parse::<u32>().unwrap_or_default();
+    if plus_twelve {
+        hh = ((hh % 12) + 12) % 24;
     }
-    match t.cmp(&Local::today().and_hms(hh, mm, 00)){
+    match t.cmp(&Local::today().and_hms(hh, mm, 00)) {
         Ordering::Less => return true,
         Ordering::Equal => return true,
         Ordering::Greater => return false,
