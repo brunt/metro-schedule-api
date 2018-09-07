@@ -9,7 +9,7 @@ extern crate serde;
 extern crate serde_json;
 
 use actix_web::{http, server, App, HttpResponse, Json};
-use chrono::{DateTime, Datelike, Local, Timelike, Weekday};
+use chrono::{DateTime, Datelike, Local, Weekday};
 use std::cmp::Ordering;
 use std::error::Error;
 
@@ -30,6 +30,7 @@ struct NextArrivalResponse {
     time: String,
 }
 
+//TODO: many of the stations are not getting populated with data and are appearing as None
 #[derive(Debug, Deserialize, Serialize)]
 struct StationTimeSlice {
     #[serde(rename = "Lambert Airport Terminal #1")]
@@ -111,6 +112,7 @@ struct StationTimeSlice {
 }
 
 fn main() {
+    println!("app started on port 8000");
     server::new(|| {
         App::new().resource("/next-arrival", |r| {
             r.method(http::Method::POST).with(next_arrival)
@@ -118,14 +120,13 @@ fn main() {
     }).bind("0.0.0.0:8000")
         .expect("Address already in use")
         .run();
-    println!("app started on port 8000");
 }
 
 fn next_arrival(req: Json<NextArrivalRequest>) -> HttpResponse {
     let input = req.into_inner();
     let t = Local::now();
     match parse_request_pick_file(t, input.direction.as_str()) {
-        Some(data) => match search_csv(data, &input.station, t) {
+        Some(data) => match search_csv(data, input.station.clone(), t) {
             Ok(s) => match serde_json::to_string(&NextArrivalResponse {
                 station: input.station,
                 direction: input.direction,
@@ -167,68 +168,70 @@ fn parse_request_pick_file(t: DateTime<Local>, direction: &str) -> Option<String
     };
 }
 
-fn search_csv(filename: String, station: &str, t: DateTime<Local>) -> Result<String, Box<Error>> {
-    let t = Local::now();
+fn search_csv(filename: String, station: String, t: DateTime<Local>) -> Result<String, Box<Error>> {
     match Asset::get(&filename) {
         Some(file_contents) => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
                 let record: StationTimeSlice = result?;
-                match station {
-                    "lambert" | "lambert terminal 1" | "Lambert Airport Terminal #1" => {
-                        match record.lambert_t1.clone() {
-                            Some(s) => {
-                                if schedule_time_is_later_than_now(t, s.clone()) {
-                                    return Ok(s);
-                                }
+//                println!("{:?}", record);
+                if station.eq("lambert") || station.eq("lambert terminal 1") || station.eq("Lambert Terminal #1") {
+                    match record.lambert_t1 {
+                        Some(s) => {
+                            println!("inside some lambert1 match");
+                            if schedule_time_is_later_than_now(t, s.clone()) {
+                                return Ok(s);
                             }
-                            None => continue, //empty field in csv; keep looking
                         }
-                    },
-                    "lambert2" | "lambert terminal 2" | "Lambert Airport Terminal #2" => {
-                        match record.lambert_t2.clone() {
-                            Some(s) => {
-                                if schedule_time_is_later_than_now(t, s.clone()) {
-                                    return Ok(s);
-                                }
-                            }
-                            None => continue,
-                        }
-                    },
-                    "hanley" | "north hanley" | "North Hanley Station" => match record.north_hanley.clone(){
+                        None => continue, //empty field in csv; keep looking
+                    }
+                } else if station.eq("cwe") || station.eq("central west end") || station.eq("Central West End Station") {
+                    match record.cwe {
                         Some(s) => {
                             if schedule_time_is_later_than_now(t, s.clone()) {
                                 return Ok(s);
                             }
                         }
-                        None => continue,
-                    },
-                    "umsl" | "umsl north" | "UMSL North Station" => match record.umsl_north.clone() {
+                        None => continue, //empty field in csv; keep looking
+                    }
+                } else if station.eq("cortex") || station.eq("cortex station") || station.eq("Cortex Station") {
+                    match record.cortex {
                         Some(s) => {
                             if schedule_time_is_later_than_now(t, s.clone()) {
                                 return Ok(s);
                             }
                         }
-                        None => continue,
-                    },
-                    "south umsl" | "umsl south" | "UMSL North Station" => match record.umsl_south.clone(){
+                        None => continue, //empty field in csv; keep looking
+                    }
+                } else if station.eq("8th & pine") || station.eq("8th and Pine") || station.eq("8th & Pine Station") {
+                    match record.eight_pine {
                         Some(s) => {
                             if schedule_time_is_later_than_now(t, s.clone()) {
                                 return Ok(s);
                             }
                         }
-                        None => continue,
-                    },
-                    "cortex" | "cortex station" | "Cortex Station" => match record.cortex.clone() {
+                        None => continue, //empty field in csv; keep looking
+                    }
+                }else if station.eq("convention") || station.eq("convention center") || station.eq("Convention Center Station") {
+                    match record.convention_center {
                         Some(s) => {
                             if schedule_time_is_later_than_now(t, s.clone()) {
                                 return Ok(s);
                             }
                         }
-                        None => continue,
-                    },
-                    //TODO: finish match cases
-                    _ => return Err(From::from("that station is not in the schedule")),
+                        None => continue, //empty field in csv; keep looking
+                    }
+                } else if station.eq("fvh") || station.eq("fairview heights") || station.eq("Fairview Heights Station") {
+                    match record.fairview_heights {
+                        Some(s) => {
+                            if schedule_time_is_later_than_now(t, s.clone()) {
+                                return Ok(s);
+                            }
+                        }
+                        None => continue, //empty field in csv; keep looking
+                    }
+                } else {
+                    return Err(From::from("that station is not yet added"));
                 }
             }
             return Err(From::from("failed to find a time from schedule data"));
