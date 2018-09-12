@@ -30,7 +30,6 @@ struct NextArrivalResponse {
     time: String,
 }
 
-//TODO: many of the stations are not getting populated with data and are appearing as None
 #[derive(Debug, Deserialize, Serialize)]
 struct StationTimeSlice {
     #[serde(rename = "Lambert Airport Terminal #1")]
@@ -126,7 +125,7 @@ fn next_arrival(req: Json<NextArrivalRequest>) -> HttpResponse {
     let input = req.into_inner();
     let t = Local::now();
     match parse_request_pick_file(t, input.direction.as_str()) {
-        Some(data) => match search_csv(data, input.station.clone(), t) {
+        Some(data) => match search_csv(data, input.station.to_lowercase().as_str(), t) {
             Ok(s) => match serde_json::to_string(&NextArrivalResponse {
                 station: input.station,
                 direction: input.direction,
@@ -168,70 +167,318 @@ fn parse_request_pick_file(t: DateTime<Local>, direction: &str) -> Option<String
     };
 }
 
-fn search_csv(filename: String, station: String, t: DateTime<Local>) -> Result<String, Box<Error>> {
+fn search_csv(filename: String, station: &str, t: DateTime<Local>) -> Result<String, Box<Error>> {
     match Asset::get(&filename) {
         Some(file_contents) => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
                 let record: StationTimeSlice = result?;
-//                println!("{:?}", record);
-                if station.eq("lambert") || station.eq("lambert terminal 1") || station.eq("Lambert Terminal #1") {
-                    match record.lambert_t1 {
-                        Some(s) => {
-                            println!("inside some lambert1 match");
-                            if schedule_time_is_later_than_now(t, s.clone()) {
-                                return Ok(s);
+                match station {
+                    "lambert" => {
+                        match record.lambert_t1 {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
                             }
+                            None => continue,
                         }
-                        None => continue, //empty field in csv; keep looking
-                    }
-                } else if station.eq("cwe") || station.eq("central west end") || station.eq("Central West End Station") {
-                    match record.cwe {
-                        Some(s) => {
-                            if schedule_time_is_later_than_now(t, s.clone()) {
-                                return Ok(s);
+                    },
+                    "lambert2" => {
+                        match record.lambert_t2 {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
                             }
+                            None => continue,
                         }
-                        None => continue, //empty field in csv; keep looking
-                    }
-                } else if station.eq("cortex") || station.eq("cortex station") || station.eq("Cortex Station") {
-                    match record.cortex {
-                        Some(s) => {
-                            if schedule_time_is_later_than_now(t, s.clone()) {
-                                return Ok(s);
+                    },
+                    "hanley" => {
+                        match record.north_hanley {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
                             }
+                            None => continue,
                         }
-                        None => continue, //empty field in csv; keep looking
-                    }
-                } else if station.eq("8th & pine") || station.eq("8th and Pine") || station.eq("8th & Pine Station") {
-                    match record.eight_pine {
-                        Some(s) => {
-                            if schedule_time_is_later_than_now(t, s.clone()) {
-                                return Ok(s);
+                    },
+                    "umsl north" | "umsl" => {
+                        match record.umsl_north {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
                             }
+                            None => continue,
                         }
-                        None => continue, //empty field in csv; keep looking
-                    }
-                }else if station.eq("convention") || station.eq("convention center") || station.eq("Convention Center Station") {
-                    match record.convention_center {
-                        Some(s) => {
-                            if schedule_time_is_later_than_now(t, s.clone()) {
-                                return Ok(s);
+                    },
+                    "umsl south" => {
+                        match record.umsl_south {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
                             }
+                            None => continue,
                         }
-                        None => continue, //empty field in csv; keep looking
-                    }
-                } else if station.eq("fvh") || station.eq("fairview heights") || station.eq("Fairview Heights Station") {
-                    match record.fairview_heights {
-                        Some(s) => {
-                            if schedule_time_is_later_than_now(t, s.clone()) {
-                                return Ok(s);
+                    },
+                    "rock road" => {
+                        match record.rock_road {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
                             }
+                            None => continue,
                         }
-                        None => continue, //empty field in csv; keep looking
                     }
-                } else {
-                    return Err(From::from("that station is not yet added"));
+                    "wellston" => {
+                        match record.wellston {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "delmar" => {
+                        match record.delmar_loop {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "shrewsbury" => {
+                        match record.shrewsbury {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "sunnen" => {
+                        match record.sunnen {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "maplewood" => {
+                        match record.maplewood_manchester {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "brentwood" => {
+                        match record.brentwood {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "richmond" | "richmond heights" => {
+                        match record.richmond_heights {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "clayton" => {
+                        match record.clayton {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "forsyth" => {
+                        match record.forsyth {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "u city" | "university city" => {
+                        match record.u_city {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "skinker" => {
+                        match record.skinker {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "forest park" => {
+                        match record.forest_park {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "cwe" | "central west end" => {
+                        match record.cwe {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "cortex" => {
+                        match record.cortex {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "grand" => {
+                        match record.grand {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "union" => {
+                        match record.union {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "civic center" | "civic" => {
+                        match record.civic_center {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "stadium" => {
+                        match record.stadium {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "8th and pine" | "8th pine" => {
+                        match record.eight_pine {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "convention center" | "convention" => {
+                        match record.convention_center {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "lacledes" | "lacledes landing" => {
+                        match record.lacledes_landing {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "east riverfront" => {
+                        match record.east_riverfront {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "fifth missouri" | "5th missouri" => {
+                        match record.fifth_missouri {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "emerson" | "emerson park" => {
+                        match record.emerson_park {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "jjk" | "jackie joiner" => {
+                        match record.jjk {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "washington" => {
+                        match record.washington {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "fvh" | "fairview heights" => {
+                        match record.fairview_heights {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "memorial hospital" => {
+                        match record.memorial_hospital {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "swansea" => {
+                        match record.swansea {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "belleville" => {
+                        match record.belleville {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "college" => {
+                        match record.college {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    "shiloh" | "shiloh scott" => {
+                        match record.shiloh_scott {
+                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
+                                return Ok(s)
+                            }
+                            None => continue,
+                        }
+                    },
+                    _ => return Err(From::from("that station is not in the schedule")),
                 }
             }
             return Err(From::from("failed to find a time from schedule data"));
