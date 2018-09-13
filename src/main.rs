@@ -2,6 +2,7 @@
 extern crate rust_embed;
 #[macro_use]
 extern crate serde_derive;
+extern crate actix;
 extern crate actix_web;
 extern crate chrono;
 extern crate csv;
@@ -111,39 +112,38 @@ struct StationTimeSlice {
 }
 
 fn main() {
-    println!("app started on port 8000");
-    server::new(|| {
+    let sys = actix::System::new("api");
+    server::new(move || {
         App::new().resource("/next-arrival", |r| {
             r.method(http::Method::POST).with(next_arrival)
         })
     }).bind("0.0.0.0:8000")
         .expect("Address already in use")
-        .run();
+        .shutdown_timeout(5)
+        .start();
+    println!("app started on port 8000");
+    let _ = sys.run();
 }
 
 fn next_arrival(req: Json<NextArrivalRequest>) -> HttpResponse {
     let input = req.into_inner();
     let t = Local::now();
     match parse_request_pick_file(t, input.direction.as_str()) {
-        Some(data) => match search_csv(data, input.station.to_lowercase().as_str(), t) {
-            Ok(s) => match serde_json::to_string(&NextArrivalResponse {
-                station: input.station,
-                direction: input.direction,
-                time: s,
-            }) {
-                Ok(s) => return HttpResponse::Ok().content_type("application/json").body(s),
-                _ => {
-                    return HttpResponse::BadRequest()
-                        .reason("error building response")
-                        .finish()
+        Some(data) => match Asset::get(&data) {
+            Some(file_contents) => {
+                match search_csv(&file_contents, input.station.to_lowercase().as_str(), t) {
+                    Ok(s) => match serde_json::to_string(&NextArrivalResponse {
+                        station: input.station,
+                        direction: input.direction,
+                        time: s,
+                    }) {
+                        Ok(s) => return HttpResponse::Ok().content_type("application/json").body(s),
+                        Err(_) => return HttpResponse::InternalServerError().into(),
+                    },
+                    Err(_) => return HttpResponse::InternalServerError().into(),
                 }
-            },
-            Err(e) => {
-                println!("{:?}", e.description());
-                return HttpResponse::BadRequest()
-                    .reason("error during match")
-                    .finish();
             }
+            None => return HttpResponse::InternalServerError().into(),
         },
         None => {
             return HttpResponse::BadRequest()
@@ -167,323 +167,507 @@ fn parse_request_pick_file(t: DateTime<Local>, direction: &str) -> Option<String
     };
 }
 
-fn search_csv(filename: String, station: &str, t: DateTime<Local>) -> Result<String, Box<Error>> {
-    match Asset::get(&filename) {
-        Some(file_contents) => {
+fn search_csv(
+    file_contents: &[u8],
+    station: &str,
+    t: DateTime<Local>,
+) -> Result<String, Box<Error>> {
+    match station {
+        "lambert" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
                 let record: StationTimeSlice = result?;
-                match station {
-                    "lambert" => {
-                        match record.lambert_t1 {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
+                match record.lambert_t1 {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
                     },
-                    "lambert2" => {
-                        match record.lambert_t2 {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "hanley" => {
-                        match record.north_hanley {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "umsl north" | "umsl" => {
-                        match record.umsl_north {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "umsl south" => {
-                        match record.umsl_south {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "rock road" => {
-                        match record.rock_road {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    }
-                    "wellston" => {
-                        match record.wellston {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "delmar" => {
-                        match record.delmar_loop {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "shrewsbury" => {
-                        match record.shrewsbury {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "sunnen" => {
-                        match record.sunnen {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "maplewood" => {
-                        match record.maplewood_manchester {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "brentwood" => {
-                        match record.brentwood {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "richmond" | "richmond heights" => {
-                        match record.richmond_heights {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "clayton" => {
-                        match record.clayton {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "forsyth" => {
-                        match record.forsyth {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "u city" | "university city" => {
-                        match record.u_city {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "skinker" => {
-                        match record.skinker {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "forest park" => {
-                        match record.forest_park {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "cwe" | "central west end" => {
-                        match record.cwe {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "cortex" => {
-                        match record.cortex {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "grand" => {
-                        match record.grand {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "union" => {
-                        match record.union {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "civic center" | "civic" => {
-                        match record.civic_center {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "stadium" => {
-                        match record.stadium {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "8th and pine" | "8th pine" => {
-                        match record.eight_pine {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "convention center" | "convention" => {
-                        match record.convention_center {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "lacledes" | "lacledes landing" => {
-                        match record.lacledes_landing {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "east riverfront" => {
-                        match record.east_riverfront {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "fifth missouri" | "5th missouri" => {
-                        match record.fifth_missouri {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "emerson" | "emerson park" => {
-                        match record.emerson_park {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "jjk" | "jackie joiner" => {
-                        match record.jjk {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "washington" => {
-                        match record.washington {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "fvh" | "fairview heights" => {
-                        match record.fairview_heights {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "memorial hospital" => {
-                        match record.memorial_hospital {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "swansea" => {
-                        match record.swansea {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "belleville" => {
-                        match record.belleville {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "college" => {
-                        match record.college {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    "shiloh" | "shiloh scott" => {
-                        match record.shiloh_scott {
-                            Some(s) => if schedule_time_is_later_than_now(t, s.clone()){
-                                return Ok(s)
-                            }
-                            None => continue,
-                        }
-                    },
-                    _ => return Err(From::from("that station is not in the schedule")),
+                    None => continue,
                 }
             }
             return Err(From::from("failed to find a time from schedule data"));
-        }
-        None => Err(From::from("failed to get embedded csv file")),
+        },
+        "lambert2" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.lambert_t2 {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "hanley" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.north_hanley {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "umsl north" | "umsl" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.umsl_north {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "umsl south" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.umsl_south {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "rock road" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.rock_road {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "wellston" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.wellston {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "delmar" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.delmar_loop {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "shrewsbury" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.shrewsbury {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "sunnen" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.sunnen {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "maplewood" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.maplewood_manchester {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "brentwood" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.brentwood {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "richmond" | "richmond heights" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.richmond_heights {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "clayton" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.clayton {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "forsyth" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.forsyth {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "u city" | "university city" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.u_city {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "skinker" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.skinker {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "forest park" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.forest_park {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "cwe" | "central west end" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.cwe {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "cortex" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.cortex {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "grand" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.grand {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "union" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.union {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "civic center" | "civic" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.civic_center {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "stadium" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.stadium {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "8th and pine" | "8th pine" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.eight_pine {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "convention center" | "convention" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.convention_center {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "lacledes" | "lacledes landing" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.lacledes_landing {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "east riverfront" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.east_riverfront {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "fifth missouri" | "5th missouri" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.fifth_missouri {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "emerson" | "emerson park" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.emerson_park {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "jjk" | "jackie joiner" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.jjk {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "washington" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.washington {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "fvh" | "fairview heights" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.fairview_heights {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "memorial hospital" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.memorial_hospital {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "swansea" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.swansea {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "belleville" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.belleville {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "college" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.college {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        "shiloh" | "shiloh scott" => {
+            let mut reader = csv::Reader::from_reader(&file_contents[..]);
+            for result in reader.deserialize() {
+                let record: StationTimeSlice = result?;
+                match record.shiloh_scott {
+                    Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
+                        return Ok(s);
+                    },
+                    None => continue,
+                }
+            }
+            return Err(From::from("failed to find a time from schedule data"));
+        },
+        _ => return Err(From::from("that station is not in the schedule")),
     }
 }
 
