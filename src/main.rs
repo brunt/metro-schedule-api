@@ -696,8 +696,8 @@ fn schedule_time_is_later_than_now(t: DateTime<Local>, mut s: String) -> bool {
 fn line_info(mut s: String) -> (String, String) {
     let line = match s.pop() {
         Some(c) => match c {
-            'R' => "Red",
-            'B' => "Blue",
+            'R' => "red",
+            'B' => "blue",
             _ => "", 
         }
         None => ""

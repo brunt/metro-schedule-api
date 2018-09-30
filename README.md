@@ -15,9 +15,10 @@ Request: POST localhost:8000/next-arrival
 Response:
 ```json
 {
-	"station": "cwe",
-	"direction": "west",
-	"time": "9:44P"
+	"station":"cwe",
+	"direction":"west",
+	"line":"blue",
+	"time":"1:34P"
 }
 ```
 
