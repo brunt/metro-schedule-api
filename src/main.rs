@@ -28,14 +28,15 @@ struct NextArrivalRequest {
 struct NextArrivalResponse {
     station: String,
     direction: String,
+    line: String,
     time: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 struct StationTimeSlice {
-    #[serde(rename = "Lambert Airport Terminal #1")]
+    #[serde(rename = "Lambert Airport Terminal # 1")]
     lambert_t1: Option<String>,
-    #[serde(rename = "Lambert Airport Terminal #2")]
+    #[serde(rename = "Lambert Airport Terminal # 2")]
     lambert_t2: Option<String>,
     #[serde(rename = "North Hanley Station")]
     north_hanley: Option<String>,
@@ -49,13 +50,13 @@ struct StationTimeSlice {
     wellston: Option<String>,
     #[serde(rename = "Delmar Loop Station")]
     delmar_loop: Option<String>,
-    #[serde(rename = "Shrewsbury Station")]
+    #[serde(rename = "ShrewsburyLansdowne I44 Station")]
     shrewsbury: Option<String>,
     #[serde(rename = "Sunnen Station")]
     sunnen: Option<String>,
     #[serde(rename = "MaplewoodManchester Station")]
     maplewood_manchester: Option<String>,
-    #[serde(rename = "Brentwood Station")]
+    #[serde(rename = "Brentwood I64 Station")]
     brentwood: Option<String>,
     #[serde(rename = "Richmond Heights Station")]
     richmond_heights: Option<String>,
@@ -63,11 +64,11 @@ struct StationTimeSlice {
     clayton: Option<String>,
     #[serde(rename = "Forsyth Station")]
     forsyth: Option<String>,
-    #[serde(rename = "U City Big Bend Station")]
+    #[serde(rename = "University CityBig Bend Station")]
     u_city: Option<String>,
     #[serde(rename = "Skinker Station")]
     skinker: Option<String>,
-    #[serde(rename = "Forest Park DeBaliviere Station")]
+    #[serde(rename = "Forest ParkDeBaliviere Station")]
     forest_park: Option<String>,
     #[serde(rename = "Central West End Station")]
     cwe: Option<String>,
@@ -85,7 +86,7 @@ struct StationTimeSlice {
     eight_pine: Option<String>,
     #[serde(rename = "Convention Center Station")]
     convention_center: Option<String>,
-    #[serde(rename = "Lacledes Landing Station")]
+    #[serde(rename = "Laclede's Landing Station")]
     lacledes_landing: Option<String>,
     #[serde(rename = "East Riverfront Station")]
     east_riverfront: Option<String>,
@@ -107,7 +108,7 @@ struct StationTimeSlice {
     belleville: Option<String>,
     #[serde(rename = "College Station")]
     college: Option<String>,
-    #[serde(rename = "Shiloh-Scott Station")]
+    #[serde(rename = "ShilohScott Station")]
     shiloh_scott: Option<String>,
 }
 
@@ -135,7 +136,8 @@ fn next_arrival(req: Json<NextArrivalRequest>) -> HttpResponse {
                     Ok(s) => match serde_json::to_string(&NextArrivalResponse {
                         station: input.station,
                         direction: input.direction,
-                        time: s,
+                        line: s.1,
+                        time: s.0,
                     }) {
                         Ok(s) => return HttpResponse::Ok().content_type("application/json").body(s),
                         Err(_) => return HttpResponse::InternalServerError().into(),
@@ -155,7 +157,8 @@ fn next_arrival(req: Json<NextArrivalRequest>) -> HttpResponse {
 
 fn parse_request_pick_file(t: DateTime<Local>, direction: &str) -> Option<String> {
     let day: &str = match t.weekday() {
-        Weekday::Sat | Weekday::Sun => "weekend",
+        Weekday::Sat => "saturday",
+        Weekday::Sun => "sunday",
         _ => "weekday",
     };
     match direction {
@@ -171,7 +174,7 @@ fn search_csv(
     file_contents: &[u8],
     station: &str,
     t: DateTime<Local>,
-) -> Result<String, Box<Error>> {
+) -> Result<(String, String), Box<Error>> {
     match station {
         "lambert" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
@@ -179,7 +182,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.lambert_t1 {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -192,7 +195,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.lambert_t2 {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -205,7 +208,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.north_hanley {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -218,7 +221,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.umsl_north {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -231,7 +234,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.umsl_south {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -244,7 +247,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.rock_road {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -257,7 +260,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.wellston {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -270,7 +273,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.delmar_loop {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -283,7 +286,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.shrewsbury {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -296,7 +299,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.sunnen {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -309,7 +312,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.maplewood_manchester {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -322,7 +325,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.brentwood {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -335,7 +338,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.richmond_heights {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -348,7 +351,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.clayton {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -361,7 +364,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.forsyth {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -374,7 +377,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.u_city {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -387,7 +390,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.skinker {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -400,7 +403,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.forest_park {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -413,7 +416,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.cwe {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -426,7 +429,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.cortex {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -439,7 +442,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.grand {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -452,7 +455,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.union {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -465,7 +468,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.civic_center {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -478,7 +481,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.stadium {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -491,7 +494,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.eight_pine {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -504,7 +507,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.convention_center {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -517,7 +520,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.lacledes_landing {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -530,7 +533,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.east_riverfront {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -543,7 +546,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.fifth_missouri {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -556,7 +559,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.emerson_park {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -569,7 +572,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.jjk {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -582,7 +585,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.washington {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -595,7 +598,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.fairview_heights {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -608,7 +611,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.memorial_hospital {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -621,7 +624,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.swansea {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -634,7 +637,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.belleville {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -647,7 +650,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.college {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -660,7 +663,7 @@ fn search_csv(
                 let record: StationTimeSlice = result?;
                 match record.shiloh_scott {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
-                        return Ok(s);
+                        return Ok(line_info(s));
                     },
                     None => continue,
                 }
@@ -673,6 +676,7 @@ fn search_csv(
 
 fn schedule_time_is_later_than_now(t: DateTime<Local>, mut s: String) -> bool {
     let mut plus_twelve = false;
+    let _ = s.pop(); //remove line type
     if s.pop().unwrap().to_string().eq("P") {
         plus_twelve = true;
     }
@@ -687,4 +691,16 @@ fn schedule_time_is_later_than_now(t: DateTime<Local>, mut s: String) -> bool {
         Ordering::Equal => return true,
         Ordering::Greater => return false,
     }
+}
+
+fn line_info(mut s: String) -> (String, String) {
+    let line = match s.pop() {
+        Some(c) => match c {
+            'R' => "Red",
+            'B' => "Blue",
+            _ => "", 
+        }
+        None => ""
+    };
+    (s, line.to_string())
 }

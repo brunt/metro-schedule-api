@@ -23,7 +23,7 @@ Response:
 
 Note that this is not Japan and that trains may be late/early by ±2 minutes or more. 
 
-This API is intended for timing your arrival to a Metrolink station in an optimal way. It does not discern red line trains from blue line trains. For more advanced route planning with public transit, see Google Maps or [Moovit](https://moovit.com/).
+This API is intended for timing your arrival to a Metrolink station in an optimal way. For more advanced route planning with public transit, see Google Maps or [Moovit](https://moovit.com/).
 
 A valid ticket or pass is required to ride the Metro trains.
 
