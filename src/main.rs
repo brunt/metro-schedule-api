@@ -527,7 +527,7 @@ fn search_csv(
             }
             return Err(From::from("failed to find a time from schedule data"));
         },
-        "east riverfront" => {
+        "riverfront" | "east riverfront" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
                 let record: StationTimeSlice = result?;
