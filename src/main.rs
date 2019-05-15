@@ -12,7 +12,6 @@ extern crate serde_json;
 use actix_web::{http, server, App, HttpResponse, Json};
 use chrono::{DateTime, Datelike, Local, Weekday};
 use std::cmp::Ordering;
-use std::error::Error;
 
 #[derive(RustEmbed)]
 #[folder = "data/"]
@@ -174,12 +173,12 @@ fn search_csv(
     file_contents: &[u8],
     station: &str,
     t: DateTime<Local>,
-) -> Result<(String, String), Box<Error>> {
+) -> Result<(String, String), &'static str> {
     match station {
         "lambert" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.lambert_t1 {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -187,12 +186,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "lambert2" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.lambert_t2 {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -200,12 +199,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "hanley" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.north_hanley {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -213,12 +212,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "umsl north" | "umsl" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.umsl_north {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -226,12 +225,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "umsl south" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.umsl_south {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -239,12 +238,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "rock road" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.rock_road {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -252,12 +251,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "wellston" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.wellston {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -265,12 +264,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "delmar" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.delmar_loop {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -278,12 +277,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "shrewsbury" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.shrewsbury {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -291,12 +290,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "sunnen" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.sunnen {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -304,12 +303,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "maplewood" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.maplewood_manchester {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -317,12 +316,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "brentwood" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.brentwood {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -330,12 +329,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "richmond" | "richmond heights" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.richmond_heights {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -343,12 +342,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "clayton" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.clayton {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -356,12 +355,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "forsyth" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.forsyth {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -369,12 +368,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "u city" | "university city" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.u_city {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -382,12 +381,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "skinker" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.skinker {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -395,12 +394,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "forest park" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.forest_park {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -408,12 +407,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "cwe" | "central west end" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.cwe {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -421,12 +420,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "cortex" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.cortex {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -434,12 +433,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "grand" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.grand {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -447,12 +446,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "union" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.union {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -460,12 +459,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "civic center" | "civic" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.civic_center {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -473,12 +472,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "stadium" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.stadium {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -486,12 +485,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "8th and pine" | "8th pine" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.eight_pine {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -499,12 +498,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "convention center" | "convention" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.convention_center {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -512,12 +511,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "lacledes" | "lacledes landing" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.lacledes_landing {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -525,12 +524,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "riverfront" | "east riverfront" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.east_riverfront {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -538,12 +537,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "fifth missouri" | "5th missouri" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.fifth_missouri {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -551,12 +550,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "emerson" | "emerson park" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.emerson_park {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -564,12 +563,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "jjk" | "jackie joiner" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.jjk {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -577,12 +576,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "washington" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.washington {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -590,12 +589,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "fvh" | "fairview heights" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.fairview_heights {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -603,12 +602,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "memorial hospital" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.memorial_hospital {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -616,12 +615,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "swansea" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.swansea {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -629,12 +628,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "belleville" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.belleville {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -642,12 +641,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "college" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.college {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -655,12 +654,12 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
         "shiloh" | "shiloh scott" => {
             let mut reader = csv::Reader::from_reader(&file_contents[..]);
             for result in reader.deserialize() {
-                let record: StationTimeSlice = result?;
+                let record: StationTimeSlice = result.unwrap();
                 match record.shiloh_scott {
                     Some(s) => if schedule_time_is_later_than_now(t, s.clone()) {
                         return Ok(line_info(s));
@@ -668,9 +667,9 @@ fn search_csv(
                     None => continue,
                 }
             }
-            return Err(From::from("failed to find a time from schedule data"));
+            return Err("failed to find a time from schedule data");
         },
-        _ => return Err(From::from("that station is not in the schedule")),
+        _ => return Err("that station is not in the schedule"),
     }
 }
 
