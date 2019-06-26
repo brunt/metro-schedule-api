@@ -2,14 +2,13 @@
 extern crate rust_embed;
 #[macro_use]
 extern crate serde_derive;
-extern crate actix;
 extern crate actix_web;
 extern crate chrono;
 extern crate csv;
 extern crate serde;
 extern crate serde_json;
 
-use actix_web::{http, server, App, HttpResponse, Json};
+use actix_web::{web, App, HttpResponse, HttpServer};
 use chrono::{DateTime, Datelike, Local, Weekday};
 use std::cmp::Ordering;
 
@@ -111,21 +110,17 @@ struct StationTimeSlice {
     shiloh_scott: Option<String>,
 }
 
-fn main() {
-    let sys = actix::System::new("api");
-    server::new(move || {
-        App::new().resource("/next-arrival", |r| {
-            r.method(http::Method::POST).with(next_arrival)
-        })
-    }).bind("0.0.0.0:8000")
-        .expect("Address already in use")
-        .shutdown_timeout(5)
-        .start();
-    println!("app started on port 8000");
-    let _ = sys.run();
+fn main() -> std::io::Result<()> {
+    HttpServer::new(|| {
+        App::new()
+            .service(web::resource("/next-arrival")
+                .route(web::post().to(next_arrival)))
+    })
+        .bind("0.0.0.0:8000")?
+        .run()
 }
 
-fn next_arrival(req: Json<NextArrivalRequest>) -> HttpResponse {
+fn next_arrival(req: web::Json<NextArrivalRequest>) -> HttpResponse {
     let input = req.into_inner();
     let t = Local::now();
     match parse_request_pick_file(t, input.direction.as_str()) {
