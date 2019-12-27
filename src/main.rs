@@ -9,7 +9,7 @@ extern crate csv;
 extern crate serde;
 extern crate serde_json;
 
-use actix_web::{web, App, HttpResponse, HttpServer};
+use actix_web::{post, web, App, HttpResponse, HttpServer};
 use chrono::{DateTime, Datelike, Local, Weekday};
 use clap::{App as ClApp, Arg};
 use std::cmp::Ordering;
@@ -112,19 +112,20 @@ struct StationTimeSlice {
     shiloh_scott: Option<String>,
 }
 
-fn main() -> std::io::Result<()> {
+#[actix_rt::main]
+async fn main() -> std::io::Result<()> {
     let args = ClApp::new("metro-schedule-api")
         .arg(Arg::with_name("port").help("port number for webserver"))
         .get_matches();
     let port = args.value_of("port").unwrap_or("8000");
     println!("app starting on port {}", &port);
-    HttpServer::new(move || {
-        App::new().service(web::resource("/next-arrival").route(web::post().to(next_arrival)))
-    })
-    .bind(format!("0.0.0.0:{}", port))?
-    .run()
+    HttpServer::new(|| App::new().service(next_arrival))
+        .bind(format!("0.0.0.0:{}", port))?
+        .run()
+        .await
 }
 
+#[post("/next-arrival")]
 fn next_arrival(req: web::Json<NextArrivalRequest>) -> HttpResponse {
     let input = req.into_inner();
     let t = Local::now();
