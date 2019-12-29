@@ -2,17 +2,12 @@
 extern crate rust_embed;
 #[macro_use]
 extern crate serde_derive;
-extern crate actix_web;
-extern crate chrono;
-extern crate clap;
-extern crate csv;
-extern crate serde;
-extern crate serde_json;
 
 use actix_web::{post, web, App, HttpResponse, HttpServer};
 use chrono::{DateTime, Datelike, Local, Weekday};
 use clap::{App as ClApp, Arg};
 use std::cmp::Ordering;
+use csv::Reader;
 
 #[derive(RustEmbed)]
 #[folder = "data/"]
@@ -173,7 +168,7 @@ fn search_csv(
     station: &str,
     t: DateTime<Local>,
 ) -> Result<(String, String), &'static str> {
-    let mut reader = csv::Reader::from_reader(&file_contents[..]);
+    let mut reader = Reader::from_reader(&file_contents[..]);
     match station {
         "lambert" => {
             for result in reader.deserialize() {
