@@ -4,6 +4,7 @@ extern crate rust_embed;
 extern crate serde_derive;
 
 use actix_web::{post, web, App, HttpResponse, HttpServer};
+use actix_web_prom::PrometheusMetrics;
 use chrono::{DateTime, Datelike, Local, Weekday};
 use clap::{App as ClApp, Arg};
 use std::cmp::Ordering;
@@ -114,7 +115,10 @@ async fn main() -> std::io::Result<()> {
         .get_matches();
     let port = args.value_of("port").unwrap_or("8000");
     println!("app starting on port {}", &port);
-    HttpServer::new(|| App::new().service(next_arrival))
+    let prometheus = PrometheusMetrics::new("metro", Some("/metrics"), None);
+    HttpServer::new(move || App::new()
+        .wrap(prometheus.clone())
+        .service(next_arrival))
         .bind(format!("0.0.0.0:{}", port))?
         .run()
         .await
