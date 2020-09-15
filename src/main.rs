@@ -108,7 +108,7 @@ struct StationTimeSlice {
     shiloh_scott: Option<String>,
 }
 
-#[actix_rt::main]
+#[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let args = ClApp::new("metro-schedule-api")
         .arg(Arg::with_name("port").help("port number for webserver"))
@@ -125,7 +125,7 @@ async fn main() -> std::io::Result<()> {
 }
 
 #[post("/next-arrival")]
-fn next_arrival(req: web::Json<NextArrivalRequest>) -> HttpResponse {
+async fn next_arrival(req: web::Json<NextArrivalRequest>) -> HttpResponse {
     let input = req.into_inner();
     let t = Local::now();
     match parse_request_pick_file(t, input.direction.as_str()) {
